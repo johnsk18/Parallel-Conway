@@ -4,8 +4,9 @@
 
 #define WIDTH 50
 #define HEIGHT 25
-#define TIME 300
+#define TIME 100
 
+// Global Definitions
 int **curr, **next;
 
 void spawnGlider() { // spawns a glider to the board
@@ -65,8 +66,7 @@ void printBoard(int** board) { // prints the board
 }
 
 int getNeighbors(int** board, int i, int j) { // returns the amount of living cells around board[i][j]
-	int count = 0, i_, j_;
-
+	int count = 0, i_, j_; // i_ and j_ represent the modded coordinates, if negative, they get added to either the baord height or length respectively
 	if (board[((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at top left most position
 	if (board[((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-0)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at top mid most position
 	if (board[((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j+1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at top right most position
@@ -75,7 +75,6 @@ int getNeighbors(int** board, int i, int j) { // returns the amount of living ce
 	if (board[((i_ = (i+1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at bottom left most position
 	if (board[((i_ = (i+1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-0)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at bottom mid most position
 	if (board[((i_ = (i+1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j+1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at bottom right most position
-
 	return count;
 }
 
@@ -95,15 +94,15 @@ int main(int argc, char *argv[]) {
 		for (i = 0; i < HEIGHT; i++) {
 			for (j = 0; j < WIDTH; j++) {
 				int neighbors = getNeighbors(curr, i, j);
-				if (curr[i][j]) next[i][j] = (neighbors == 2 || neighbors == 3) ? 1 : 0; // under/over/suitable population
-				else if (neighbors == 3) next[i][j] = 1; // reproduction
+				if (curr[i][j]) next[i][j] = (neighbors == 2 || neighbors == 3) ? 1 : 0; // if living cell has 2-3 neighbors, it lives, else dies
+				else if (neighbors == 3) next[i][j] = 1; // if dead cell has 3 neighbors, new one is born
 				else next[i][j] = 0; // death
 			}
 		}
 
-		for (i = 0; i < HEIGHT; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // update board
+		for (i = 0; i < HEIGHT; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates board with new data
 
-		usleep(100*1000);
+		usleep(50*1000); // sleeps for 50 milliseconds
 		printBoard(curr);
 	}
 
