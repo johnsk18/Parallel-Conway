@@ -5,11 +5,11 @@
 
 #define WIDTH 50
 #define HEIGHT 25
-#define TIME 100
+#define TIME 300
 #define THRESHOLD 0.25
 
 // Global Definitions
-int *curr, *next;
+char *curr, *next;
 
 void spawnGlider() { // spawns a glider to the board
 	curr[3 * WIDTH + 3] = 1;
@@ -58,7 +58,7 @@ void spawnGosperGliderGun() { // spawns a gosper glider gun
 	curr[5 * WIDTH + 38] = 1;
 }
 
-void printBoard(int* board) { // debug prints the board
+void printBoard(char* board) { // debug prints the board
 	int i, j;
 	for (i = 0; i < 50; i++) printf("\n");
 	for (i = 0; i < HEIGHT; i++) {
@@ -67,7 +67,7 @@ void printBoard(int* board) { // debug prints the board
 	}
 }
 
-int getNeighbors(int* board, int i, int j) { // returns the amount of living cells around board[i * WIDTH + j]
+int getNeighbors(char* board, int i, int j) { // returns the amount of living cells around board[i * WIDTH + j]
 	int count = 0, i_, j_; // i_ and j_ represent the modded coordinates, if negative, they get added to either the baord height or length respectively to simulate wrap-around
 	if (board[(((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_) * WIDTH + (((j_ = (j-1)%WIDTH) < 0) ? WIDTH + j_ : j_)]) count++; // checks if cell is alive at top left most position
 	if (board[(((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_) * WIDTH + (((j_ = (j-0)%WIDTH) < 0) ? WIDTH + j_ : j_)]) count++; // checks if cell is alive at top mid most position
@@ -84,8 +84,8 @@ int main(int argc, char *argv[]) {
 	// Initializes variables
 
 	int i, j, t;
-	curr = (int*)calloc(HEIGHT * WIDTH, sizeof(int));
-	next = (int*)calloc(HEIGHT * WIDTH, sizeof(int));
+	curr = (char*)calloc(HEIGHT * WIDTH, sizeof(char));
+	next = (char*)calloc(HEIGHT * WIDTH, sizeof(char));
 	// for (i = 0; i < HEIGHT; i++) curr[i] = (int*)calloc(WIDTH, sizeof(int));
 	// for (i = 0; i < HEIGHT; i++) next[i] = (int*)calloc(WIDTH, sizeof(int));
 
