@@ -1,15 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <assert.h>
 #include "clcg4.h"
+#include <mpi.h>
 
 #define WIDTH 50
 #define HEIGHT 25
-#define TIME 10
+#define TIME 250
 #define THRESHOLD 0.25
 
 // Global Definitions
-int **curr, **next;
+char **curr, **next, *upGhost, *downGhost;
+int mpi_size = -1, mpi_rank = -1;
 
 void spawnGlider() { // spawns a glider to the board
 	curr[3][3] = 1;
@@ -58,25 +62,41 @@ void spawnGosperGliderGun() { // spawns a gosper glider gun
 	curr[5][38] = 1;
 }
 
-void printBoard(int** board) { // debug prints the board
+void printBoard(char** board) { // debug prints the board
 	int i, j;
 	for (i = 0; i < 50; i++) printf("\n");
+	for (j = 0; j < WIDTH; ++j) printf("%c", (upGhost[j]) ? 'X' : '.'); // prints up ghost row
+	printf("\n\n");		
 	for (i = 0; i < HEIGHT; i++) {
 		for (j = 0; j < WIDTH; j++) printf("%c", (board[i][j]) ? 'X' : '.');
 		printf("\n");
 	}
+	printf("\n");
+	for (j = 0; j < WIDTH; ++j) printf("%c", (downGhost[j]) ? 'X' : '.'); // prints down ghost row
+	printf("\n");
 }
 
-int getNeighbors(int** board, int i, int j) { // returns the amount of living cells around board[i][j]
-	int count = 0, i_, j_; // i_ and j_ represent the modded coordinates, if negative, they get added to either the baord height or length respectively to simulate wrap-around
-	if (board[((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at top left most position
-	if (board[((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-0)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at top mid most position
-	if (board[((i_ = (i-1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j+1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at top right most position
-	if (board[((i_ = (i-0)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at mid left most position
-	if (board[((i_ = (i-0)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j+1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at mid right most position
-	if (board[((i_ = (i+1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at bottom left most position
-	if (board[((i_ = (i+1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j-0)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at bottom mid most position
-	if (board[((i_ = (i+1)%HEIGHT) < 0) ? HEIGHT + i_ : i_][((j_ = (j+1)%WIDTH) < 0) ? WIDTH + j_ : j_]) count++; // checks if cell is alive at bottom right most position
+int getCell(char** board, int i, int j) {
+	if (i < -1 || i > HEIGHT) assert(-1);
+
+	if (j < 0) j += WIDTH;
+	if (j >= WIDTH) j %= WIDTH;
+
+	if (i == -1) return upGhost[j]; // access up ghost row
+	else if (i == HEIGHT) return downGhost[j]; // access down ghost row
+	else return board[i][j]; // access board
+}
+
+int getNeighbors(char** board, int i, int j) { // returns the amount of living cells around board[i][j]
+	int count = 0;
+	if (getCell(board, i-1, j-1)) count++; // checks if cell is alive at top left most position
+	if (getCell(board, i-1, j  )) count++; // checks if cell is alive at top mid most position
+	if (getCell(board, i-1, j+1)) count++; // checks if cell is alive at top right most position
+	if (getCell(board, i  , j-1)) count++; // checks if cell is alive at mid left most position
+	if (getCell(board, i  , j+1)) count++; // checks if cell is alive at mid right most position
+	if (getCell(board, i+1, j-1)) count++; // checks if cell is alive at bottom left most position
+	if (getCell(board, i+1, j  )) count++; // checks if cell is alive at bottom mid most position
+	if (getCell(board, i+1, j+1)) count++; // checks if cell is alive at bottom right most position
 	return count;
 }
 
@@ -84,12 +104,20 @@ int main(int argc, char *argv[]) {
 	// Initializes variables
 
 	int i, j, t;
-	curr = (int**)calloc(HEIGHT, sizeof(int*));
-	next = (int**)calloc(HEIGHT, sizeof(int*));
-	for (i = 0; i < HEIGHT; i++) curr[i] = (int*)calloc(WIDTH, sizeof(int));
-	for (i = 0; i < HEIGHT; i++) next[i] = (int*)calloc(WIDTH, sizeof(int));
+	curr = (char**)calloc(HEIGHT, sizeof(char*));
+	next = (char**)calloc(HEIGHT, sizeof(int*));
+	for (i = 0; i < HEIGHT; i++) curr[i] = (char*)calloc(WIDTH, sizeof(char));
+	for (i = 0; i < HEIGHT; i++) next[i] = (char*)calloc(WIDTH, sizeof(char));
 
 	InitDefault();
+
+	MPI_Init( &argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+
+  upGhost = (char*)calloc(WIDTH, sizeof(char));
+	downGhost = (char*)calloc(WIDTH, sizeof(char));
+
 
 	// Sets and prints the intial state of the board
 
@@ -114,23 +142,33 @@ int main(int argc, char *argv[]) {
 	for (t = 0; t < TIME; t++) { // simulation running for TIME ticks
 		for (i = 0; i < HEIGHT; i++) {
 			for (j = 0; j < WIDTH; j++) {
-				int neighbors = getNeighbors(curr, i, j), index = j + (WIDTH * 0); // index = local_row + (rows_per_rank * mympirank)
-				double value = GenVal(index);
-				if (THRESHOLD >= value) next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
-				else {
-					if (curr[i][j]) next[i][j] = (neighbors == 2 || neighbors == 3) ? 1 : 0; // if living cell has 2-3 neighbors, it lives, else dies
-					else next[i][j] = (neighbors == 3) ? 1 : 0; // if dead cell has 3 neighbors, new one is born, else still dead
-				}
+				int neighbors = getNeighbors(curr, i, j); 
+
+				#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
+					int index = j + ((WIDTH / mpi_size) * mpi_rank); // index = local_row + (rows_per_rank * mympirank)
+					double value = GenVal(index);
+					if (THRESHOLD >= value) {
+						next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
+						continue;
+					}
+				#endif
+
+				if (curr[i][j]) next[i][j] = (neighbors == 2 || neighbors == 3) ? 1 : 0; // if living cell has 2-3 neighbors, it lives, else dies
+				else next[i][j] = (neighbors == 3) ? 1 : 0; // if dead cell has 3 neighbors, new one is born, else still dead
 			}
 		}
 
-		// #if defined(GLIDER) || defined(GOSPER) || defined(BOARD)
-		// 	printBoard(next);
-		// #endif
-
 		for (i = 0; i < HEIGHT; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates board with new data
 
-		usleep(500*1000); // sleeps for 50 milliseconds
+		if (mpi_size == 1) { // Copy the first and last rows of this rank into the ghosts
+			memcpy(upGhost, curr[HEIGHT-1], WIDTH);
+			memcpy(downGhost, curr[0], WIDTH);
+		} else {
+			
+		}
+
+
+		usleep(100*1000); // sleeps for 50 milliseconds
 	
 		#if defined(GLIDER) || defined(GOSPER) || defined(BOARD)
 			printBoard(curr);
@@ -143,6 +181,10 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < HEIGHT; i++) free(next[i]);
 	free(curr);
 	free(next);
-
+	free(upGhost);
+	free(downGhost);
+	
+	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Finalize();
 	return 0;
 }
