@@ -18,50 +18,52 @@ MPI_Request request, request2, request3, request4;
 MPI_Status status;
 
 void spawnGlider() { // spawns a glider to the board
-	curr[3][3] = 1;
-	curr[4][4] = 1;
-	curr[4][5] = 1;
-	curr[3][5] = 1;
-	curr[2][5] = 1;
+	int n;
+	if ((n = 3 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][3] = 1;
+	if ((n = 4 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][4] = 1;
+	if ((n = 4 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][5] = 1;
+	if ((n = 3 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][5] = 1;
+	if ((n = 2 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][5] = 1;
 }
 
 void spawnGosperGliderGun() { // spawns a gosper glider gun
-	curr[6][3] = 1;
-	curr[6][4] = 1;
-	curr[7][3] = 1;
-	curr[7][4] = 1;
-	curr[7][11] = 1;
-	curr[7][13] = 1;
-	curr[8][11] = 1;
-	curr[6][13] = 1;
-	curr[8][12] = 1;
-	curr[6][12] = 1;
-	curr[5][25] = 1;
-	curr[5][27] = 1;
-	curr[6][25] = 1;
-	curr[4][27] = 1;
-	curr[6][26] = 1;
-	curr[4][26] = 1;
-	curr[8][19] = 1;
-	curr[8][20] = 1;
-	curr[9][19] = 1;
-	curr[10][19] = 1;
-	curr[9][21] = 1;
-	curr[11][38] = 1;
-	curr[11][39] = 1;
-	curr[12][38] = 1;
-	curr[13][38] = 1;
-	curr[12][40] = 1;
-	curr[11][38] = 1;
-	curr[16][29] = 1;
-	curr[16][28] = 1;
-	curr[16][27] = 1;
-	curr[17][27] = 1;
-	curr[18][28] = 1;
-	curr[4][37] = 1;
-	curr[4][38] = 1;
-	curr[5][37] = 1;
-	curr[5][38] = 1;
+	int n;
+	if ((n =  6 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][3] = 1;
+	if ((n =  6 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][4] = 1;
+	if ((n =  7 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][3] = 1;
+	if ((n =  7 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][4] = 1;
+	if ((n =  7 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][11] = 1;
+	if ((n =  7 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][13] = 1;
+	if ((n =  8 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][11] = 1;
+	if ((n =  6 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][13] = 1;
+	if ((n =  8 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][12] = 1;
+	if ((n =  6 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][12] = 1;
+	if ((n =  5 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][25] = 1;
+	if ((n =  5 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][27] = 1;
+	if ((n =  6 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][25] = 1;
+	if ((n =  4 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][27] = 1;
+	if ((n =  6 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][26] = 1;
+	if ((n =  4 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][26] = 1;
+	if ((n =  8 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][19] = 1;
+	if ((n =  8 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][20] = 1;
+	if ((n =  9 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][19] = 1;
+	if ((n = 10 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][19] = 1;
+	if ((n =  9 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][21] = 1;
+	if ((n = 11 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][38] = 1;
+	if ((n = 11 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][39] = 1;
+	if ((n = 12 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][38] = 1;
+	if ((n = 13 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][38] = 1;
+	if ((n = 12 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][40] = 1;
+	if ((n = 11 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][38] = 1;
+	if ((n = 16 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][29] = 1;
+	if ((n = 16 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][28] = 1;
+	if ((n = 16 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][27] = 1;
+	if ((n = 17 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][27] = 1;
+	if ((n = 18 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][28] = 1;
+	if ((n =  4 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][37] = 1;
+	if ((n =  4 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][38] = 1;
+	if ((n =  5 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][37] = 1;
+	if ((n =  5 - (mpi_rank * rows_per_rank)) < rows_per_rank && n >= 0) curr[n][38] = 1;
 }
 
 void printBoard(char** board) { // debug prints the board
@@ -69,27 +71,19 @@ void printBoard(char** board) { // debug prints the board
 	MPI_Barrier(MPI_COMM_WORLD);
 	for (r = 0; r < mpi_size; r++) {
 		if (mpi_rank == r) {
-			for (i = 0; r == 0 && i < 50; i++) printf("\n");
-			if (mpi_size != 1) printf("Rank %d\n", mpi_rank);
-			// if (mpi_size == 1) {
-				for (j = 0; j < WIDTH; ++j) printf("%c", (upGhost[j]) ? 'X' : '.'); // prints up ghost row
-				printf("\n\n");
-			// }
+			for (i = 0; i < 1 || (r == 0 && i < 50); i++) printf("\n");
+			for (j = 0; j < WIDTH; ++j) printf("%c", (upGhost[j]) ? 'X' : '.'); // prints up ghost row
+			printf(" Rank %d\n\n", mpi_rank);
 			for (i = 0; i < rows_per_rank; i++) {
 				for (j = 0; j < WIDTH; j++) printf("%c", (board[i][j]) ? 'X' : '.');
 				printf("\n");
 			}
-			// if (mpi_size == 1) {
-				printf("\n");
-				for (j = 0; j < WIDTH; ++j) printf("%c", (downGhost[j]) ? 'X' : '.'); // prints down ghost row
-				printf("\n");
-			// }
-			if (mpi_size != 1) printf("\n");
+			printf("\n");
+			for (j = 0; j < WIDTH; ++j) printf("%c", (downGhost[j]) ? 'X' : '.'); // prints down ghost row
+			printf("\n");
 		}
-		fflush(stdout);
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
 }
 
 int getCell(char** board, int i, int j) {
@@ -136,14 +130,14 @@ int main(int argc, char *argv[]) {
 	// Sets and prints the intial state of the board
 
 	#ifdef GLIDER
-		if (mpi_rank == 0) spawnGlider();
+		spawnGlider();
 	#endif
 
 	#ifdef GOSPER
-		if (mpi_rank == 0) spawnGosperGliderGun();
+		spawnGosperGliderGun();
 	#endif
 
-	#if !defined(GLIDER) && !defined(GOSPER)
+	#if !defined(GLIDER) && !defined(GOSPER) // intializes board to 1 for non-preset compilations
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = 1;
 	#endif
 
@@ -154,7 +148,25 @@ int main(int argc, char *argv[]) {
 	// Running simulation
 
 	for (t = 0; t < TIME; t++) { // simulation running for TIME ticks
-		for (i = 0; i < rows_per_rank; i++) {
+		// Updates ghost rows with data from other ranks
+
+		MPI_Irecv(upGhost, WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 1, MPI_COMM_WORLD, &request);
+		MPI_Isend(curr[rows_per_rank-1], WIDTH, MPI_CHAR, (mpi_rank == mpi_size - 1) ? 0 : mpi_rank + 1, 1, MPI_COMM_WORLD, &request3);
+		MPI_Irecv(downGhost, WIDTH, MPI_CHAR, (mpi_rank == mpi_size - 1) ? 0 : mpi_rank + 1, 2, MPI_COMM_WORLD, &request2);
+		MPI_Isend(curr[0], WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 2, MPI_COMM_WORLD, &request4);
+		MPI_Wait(&request, &status);
+		MPI_Wait(&request2, &status);
+		MPI_Wait(&request3, &status);
+		MPI_Wait(&request4, &status);
+	
+		#if defined(GLIDER) || defined(GOSPER) || defined(BOARD) // sleeps and prints board
+			usleep(50*1000); // sleeps for 50 milliseconds for debugging purposes
+			printBoard(curr);
+		#endif
+
+		// Updates board using game logic/randomness and ghost rows
+
+		for (i = 0; i < rows_per_rank; i++) { 
 			for (j = 0; j < WIDTH; j++) {
 				int neighbors = getNeighbors(curr, i, j); 
 
@@ -172,32 +184,10 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates board with new data
-
-		if (mpi_size == 1) { // Copy the first and last rows of this rank into the ghosts
-			memcpy(upGhost, curr[rows_per_rank-1], WIDTH);
-			memcpy(downGhost, curr[0], WIDTH);
-		} else {
-			MPI_Irecv(upGhost, WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 1, MPI_COMM_WORLD, &request);
-			MPI_Isend(curr[rows_per_rank-1], WIDTH, MPI_CHAR, (mpi_rank == mpi_size - 1) ? 0 : mpi_rank + 1, 1, MPI_COMM_WORLD, &request3);
-			MPI_Irecv(downGhost, WIDTH, MPI_CHAR, (mpi_rank == mpi_size - 1) ? 0 : mpi_rank + 1, 2, MPI_COMM_WORLD, &request2);
-			MPI_Isend(curr[0], WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 2, MPI_COMM_WORLD, &request4);
-			MPI_Wait(&request, &status);
-			MPI_Wait(&request2, &status);
-			MPI_Wait(&request3, &status);
-			MPI_Wait(&request4, &status);
-		}
-
-
-		usleep(50*1000); // sleeps for 50 milliseconds
-	
-		#if defined(GLIDER) || defined(GOSPER) || defined(BOARD)
-			MPI_Barrier(MPI_COMM_WORLD);
-			printBoard(curr);
-		#endif
+		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
 	}
 
-	// Frees variables
+	// Frees variables and finalizes MPI
 
 	for (i = 0; i < rows_per_rank; i++) free(curr[i]);
 	for (i = 0; i < rows_per_rank; i++) free(next[i]);
