@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
 				int neighbors = getNeighbors(curr, i, j); 
 
 				#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
-					int index = j + ((WIDTH / mpi_size) * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
+					int index = j + (rows_per_rank * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
 					double value = GenVal(index);
 					if (THRESHOLD >= value) {
 						next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
