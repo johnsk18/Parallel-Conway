@@ -5,20 +5,17 @@
 #include <assert.h>
 #include "clcg4.h"
 #include <mpi.h>
-#include <pthread.h>
 
 #define WIDTH 64
 #define HEIGHT 32
 #define TIME 250
 #define THRESHOLD 0.25
-#define NUMTHREADS 63
 
 // Global Definitions
 char **curr, **next, *upGhost, *downGhost;
 int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1;
 MPI_Request request, request2, request3, request4;
 MPI_Status status;
-pthread_mutex_t mutexboard;
 
 void spawnGlider() { // spawns a glider to the board
 	int n;
@@ -113,15 +110,10 @@ int getNeighbors(char** board, int i, int j) { // returns the amount of living c
 	return count;
 }
 
-void * runsim(void *arg) {
-
-}
-
 int main(int argc, char *argv[]) {
 	// Initializes variables
 
-	int i, j, k, t;
-	pthread_attr_t attr;
+	int i, j, t;
 	InitDefault();
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -132,7 +124,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < rows_per_rank; i++) curr[i] = (char*)calloc(WIDTH, sizeof(char));
 	for (i = 0; i < rows_per_rank; i++) next[i] = (char*)calloc(WIDTH, sizeof(char));
 
-  	upGhost = (char*)calloc(WIDTH, sizeof(char));
+  upGhost = (char*)calloc(WIDTH, sizeof(char));
 	downGhost = (char*)calloc(WIDTH, sizeof(char));
 
 	// Sets and prints the intial state of the board
@@ -152,21 +144,6 @@ int main(int argc, char *argv[]) {
 	#if defined(GLIDER) || defined(GOSPER) || defined(BOARD)
 		printBoard(curr);
 	#endif
-
-	// Create pthreads
-	pthread_attr_init(&attr ); // tell main thread it needs to join with child threads
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	pthread_mutex_init (&mutexboard, NULL); // create mutex
-
-	for (k = 0; k < NUMTHREADS; k++) { // create threads within node
-		pthread_create(); ////////////////////////////////
-	}
-
-	pthread_attr_destroy(&attr );
-
-	for (k = 0; k < NUMTHREADS; k++) { // join threads within node
-		pthread_join(); //////////////////////////////////
-	}
 
 	// Running simulation
 
@@ -210,7 +187,7 @@ int main(int argc, char *argv[]) {
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
 	}
 
-	// Frees variables, destroys mutex, and finalizes MPI
+	// Frees variables and finalizes MPI
 
 	for (i = 0; i < rows_per_rank; i++) free(curr[i]);
 	for (i = 0; i < rows_per_rank; i++) free(next[i]);
@@ -218,8 +195,6 @@ int main(int argc, char *argv[]) {
 	free(next);
 	free(upGhost);
 	free(downGhost);
-
-	pthread_mutex_destroy(&mutexboard);
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Finalize();
