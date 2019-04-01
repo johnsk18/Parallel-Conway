@@ -8,8 +8,8 @@
 #include <pthread.h>
 
 #define WIDTH 64
-#define HEIGHT 32
-#define TIME 300
+#define HEIGHT 32 // mpi_size * NUMTHREADS <= HEIGHT
+#define TIME 256
 #define THRESHOLD 0.25
 #define NUMTHREADS 4 // including main thread
 
@@ -124,8 +124,7 @@ void* updateRows(void* arg) { // thread function used to update rows
 			int neighbors = getNeighbors(curr, i, j); 
 
 			#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
-				int index = i + (rows_per_rank * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
-				double value = GenVal(index);
+				double value = GenVal(i); // each row has its own RNG stream
 				if (THRESHOLD > value) { // if below threshold, randomize update
 					next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
 					continue;
@@ -144,7 +143,7 @@ void* updateRows(void* arg) { // thread function used to update rows
 int main(int argc, char *argv[]) {
 	// Initializes variables and MPI
 
-	int i, j, k = 0, t;
+	int i, j, k, t;
 	InitDefault();
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -176,7 +175,7 @@ int main(int argc, char *argv[]) {
 
 	// Simulation running for TIME ticks
 
-	for (t = 0; t <= TIME; t++, k = 0) { 
+	for (t = 0, k = 0; t <= TIME; t++, k = 0) { 
 		// Updates ghost rows with data from other ranks
 
 		MPI_Irecv(upGhost, WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 1, MPI_COMM_WORLD, &request);
