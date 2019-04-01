@@ -14,7 +14,7 @@
 #define NUMTHREADS 4 // including main thread
 
 // Global Definitions
-int alive_cells_rank;
+int alive_cells_rank = 0, total_alive_cells = 0, *alive_cells_all;
 char **curr, **next, *upGhost, *downGhost;
 pthread_t* threadIDs = NULL;
 int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1, rows_per_thread = -1;
@@ -136,11 +136,11 @@ void* updateRows(void* arg) { // thread function used to update rows
 			else next[i][j] = (neighbors == 3) ? 1 : 0; // if dead cell has 3 neighbors, new one is born, else still dead
 		}
 	}
-
+	
 	pthread_mutex_lock (&mutexalive);
-	alive_cells_rank += neighbors;
+	for (i = 0 + (t * rows_per_thread); i < rows_per_thread + (t * rows_per_thread); i++) for (j = 0; j < WIDTH; j++) alive_cells_rank += next[i][j];
 	pthread_mutex_unlock (&mutexalive);
-
+	
 	if (t != 0) pthread_exit(NULL); // if not main thread, exit
 	return NULL;
 }
@@ -149,15 +149,13 @@ int main(int argc, char *argv[]) {
 	// Initializes variables and MPI
 
 	int i, j, k, t;
-	int * alive_cells_all;
-	alive_cells_all = (mpi_rank == 0) ? (int*)calloc(TIME, sizeof(int)) : NULL;
-	alive_cells_rank = 0;
 	InitDefault();
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	rows_per_rank = HEIGHT / mpi_size;
 	rows_per_thread = rows_per_rank / NUMTHREADS;
+	alive_cells_all = (mpi_rank == 0) ? (int*)calloc(TIME, sizeof(int)) : NULL;
 	if (NUMTHREADS > 1) threadIDs = calloc(NUMTHREADS - 1, sizeof(pthread_t)); 
 	curr = (char**)calloc(rows_per_rank, sizeof(char*));
 	next = (char**)calloc(rows_per_rank, sizeof(char*));
@@ -209,16 +207,12 @@ int main(int argc, char *argv[]) {
 		for (k = 0; k < NUMTHREADS - 1; k++) pthread_join(threadIDs[k], NULL); // joins threads
 
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
-	
+		
 		MPI_Reduce (&alive_cells_rank, &alive_cells_all[t], 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 	}
 
-
-	int total_alive_cells = 0;
-	for (int j = 0; j < TIME; j++) {
-		total_alive_cells += alive_cells_all[j];
-	}
 	if (mpi_rank == 0) {
+		for (int j = 0; j < TIME; j++) total_alive_cells += alive_cells_all[j];
 		printf("Finished simulation, number of alive cells: %d\n", total_alive_cells);
 	}
 
