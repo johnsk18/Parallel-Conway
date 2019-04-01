@@ -11,7 +11,7 @@
 #define HEIGHT 64
 #define TIME 2
 #define THRESHOLD 0.25
-#define NUMTHREADS 2
+#define NUMTHREADS 4
 
 // Global Definitions
 char **curr, **next, *upGhost, *downGhost;
@@ -114,19 +114,39 @@ int getNeighbors(char** board, int i, int j) { // returns the amount of living c
 	return count;
 }
 
-void* runsim(void* arg) {
+void* updateRows(void* arg) {
 	printf("THREAD IN\n");
-	long thread_number = (long) arg;
-	printf("THREAD IN2\n");
-	printf("%ld\n", thread_number);
+	int i, j, t = (int) (long) arg; // t stands for the thread number
+	printf("THREAD %d\n", t);
+	printf("%d\n", t);
+
+
+	for (i = 0 + (t * rows_per_thread); i < rows_per_thread + (t * rows_per_thread); i++) { 
+		for (j = 0; j < WIDTH; j++) {
+			int neighbors = getNeighbors(curr, i, j); 
+
+			#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
+				int index = j + (rows_per_rank * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
+				double value = GenVal(index);
+				if (THRESHOLD >= value) {
+					next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
+					continue;
+				}
+			#endif
+
+			if (curr[i][j]) next[i][j] = (neighbors == 2 || neighbors == 3) ? 1 : 0; // if living cell has 2-3 neighbors, it lives, else dies
+			else next[i][j] = (neighbors == 3) ? 1 : 0; // if dead cell has 3 neighbors, new one is born, else still dead
+		}
+	}
+
+	if (t != 0) pthread_exit(NULL);
 	return NULL;
 }
 
 int main(int argc, char *argv[]) {
 	// Initializes variables
 
-	int i, j, t;
-	long k;
+	int i, j, k = 0, t;
 	// pthread_attr_t attr;
 	InitDefault();
 	MPI_Init( &argc, &argv);
@@ -166,22 +186,9 @@ int main(int argc, char *argv[]) {
 	// pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	// pthread_mutex_init (&mutexboard, NULL); // create mutex
 
-	printf("THREAD START\n");
 
-	for (k = 1; k < NUMTHREADS; k++) { // create threads within node
-		pthread_create(&threadIDs[k], NULL, runsim, (void *) k);
-	}
-	
-	printf("THREADS CREATED\n");
-	// pthread_attr_destroy(&attr );
 
-	for (k = 0; k < NUMTHREADS - 1; k++) pthread_join(threadIDs[k], NULL); // join threads within node
-
-	// Running simulation
-
-	printf("THREADS JOINED\n");
-
-	for (t = 0; t < TIME; t++) { // simulation running for TIME ticks
+	for (t = 0; t <= TIME; t++, k = 0) { // simulation running for TIME ticks
 		// Updates ghost rows with data from other ranks
 
 		MPI_Irecv(upGhost, WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 1, MPI_COMM_WORLD, &request);
@@ -198,38 +205,42 @@ int main(int argc, char *argv[]) {
 			printBoard(curr);
 		#endif
 
+		if (t == TIME) break; // ends loop
+
 		// Updates board using game logic/randomness and ghost rows
 
-		for (i = 0; i < rows_per_rank; i++) { 
-			for (j = 0; j < WIDTH; j++) {
-				int neighbors = getNeighbors(curr, i, j); 
+		printf("THREAD START\n");
 
-				#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
-					int index = j + (rows_per_rank * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
-					double value = GenVal(index);
-					if (THRESHOLD >= value) {
-						next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
-						continue;
-					}
-				#endif
+		// Updates rows via threads (including main thread)
 
-				if (curr[i][j]) next[i][j] = (neighbors == 2 || neighbors == 3) ? 1 : 0; // if living cell has 2-3 neighbors, it lives, else dies
-				else next[i][j] = (neighbors == 3) ? 1 : 0; // if dead cell has 3 neighbors, new one is born, else still dead
-			}
-		}
+		updateRows((void *) (long) k);
+		for (k = 1; k < NUMTHREADS; k++) pthread_create(&threadIDs[k-1], NULL, updateRows, (void *) (long) k);
+		
+		printf("THREADS CREATED\n");
+		// pthread_attr_destroy(&attr );
+
+		for (k = 0; k < NUMTHREADS - 1; k++) pthread_join(threadIDs[k], NULL); // join threads within node
+
+	// Running simulation
+
+		printf("THREADS JOINED\n");
 
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
 	}
 
 	// Frees variables, destroys mutex, and finalizes MPI
 
-	for (i = 0; i < rows_per_rank; i++) free(curr[i]);
-	for (i = 0; i < rows_per_rank; i++) free(next[i]);
-	free(curr);
-	free(next);
-	free(upGhost);
-	free(downGhost);
-	free(threadIDs);
+	printf("FREEING\n");
+
+	for (i = 0; i < rows_per_rank; i++) if (curr[i]) free(curr[i]);
+	for (i = 0; i < rows_per_rank; i++) if (next[i]) free(next[i]);
+	if (curr) free(curr);
+	if (next) free(next);
+	if (upGhost) free(upGhost);
+	if (downGhost) free(downGhost);
+	if (threadIDs) free(threadIDs);
+
+	printf("DONE FREEING\n");
 
 	// pthread_mutex_destroy(&mutexboard);
 	
