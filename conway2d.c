@@ -14,12 +14,13 @@
 #define NUMTHREADS 4 // including main thread
 
 // Global Definitions
+double alive_cells_node;
 char **curr, **next, *upGhost, *downGhost;
 pthread_t* threadIDs = NULL;
 int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1, rows_per_thread = -1;
 MPI_Request request, request2, request3, request4;
 MPI_Status status;
-pthread_mutex_t mutexboard = PTHREAD_MUTEX_INITIALIZER; // TODO: Find a use for critical sections with mutex locks
+pthread_mutex_t mutexalive = PTHREAD_MUTEX_INITIALIZER;
 
 void spawnGlider() { // spawns a glider to the board
 	int n;
@@ -136,6 +137,10 @@ void* updateRows(void* arg) { // thread function used to update rows
 		}
 	}
 
+	pthread_mutex_lock (&mutexalive);
+	alive_cells_node += neighbors;
+	pthread_mutex_unlock (&mutexalive);
+
 	if (t != 0) pthread_exit(NULL); // if not main thread, exit
 	return NULL;
 }
@@ -144,6 +149,8 @@ int main(int argc, char *argv[]) {
 	// Initializes variables and MPI
 
 	int i, j, k, t;
+	double alive_cells_node = 0;
+	double alive_cells_all;
 	InitDefault();
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -156,7 +163,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < rows_per_rank; i++) curr[i] = (char*)calloc(WIDTH, sizeof(char));
 	for (i = 0; i < rows_per_rank; i++) next[i] = (char*)calloc(WIDTH, sizeof(char));
 
-  upGhost = (char*)calloc(WIDTH, sizeof(char));
+ 	upGhost = (char*)calloc(WIDTH, sizeof(char));
 	downGhost = (char*)calloc(WIDTH, sizeof(char));
 
 	// Sets and prints the intial state of the board
@@ -203,7 +210,13 @@ int main(int argc, char *argv[]) {
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
 	}
 
-	// Frees variables, destroys mutex, and finalizes MPI
+	MPI_Reduce (&alive_cells_node, &alive_cells_all, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+	if (mpi_rank = 0) {
+		printf("Finished simulation, number of alive cells: %f\n", alive_cells_all);
+	}
+
+	// Frees variables and finalizes MPI
 
 	for (i = 0; i < rows_per_rank; i++) free(curr[i]);
 	for (i = 0; i < rows_per_rank; i++) free(next[i]);
