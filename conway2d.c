@@ -8,10 +8,10 @@
 #include <pthread.h>
 
 #define WIDTH 64
-#define HEIGHT 64
-#define TIME 2
+#define HEIGHT 32
+#define TIME 300
 #define THRESHOLD 0.25
-#define NUMTHREADS 4
+#define NUMTHREADS 4 // including main thread
 
 // Global Definitions
 char **curr, **next, *upGhost, *downGhost;
@@ -19,7 +19,7 @@ pthread_t* threadIDs = NULL;
 int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1, rows_per_thread = -1;
 MPI_Request request, request2, request3, request4;
 MPI_Status status;
-pthread_mutex_t mutexboard = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexboard = PTHREAD_MUTEX_INITIALIZER; // TODO: Find a use for critical sections with mutex locks
 
 void spawnGlider() { // spawns a glider to the board
 	int n;
@@ -114,21 +114,19 @@ int getNeighbors(char** board, int i, int j) { // returns the amount of living c
 	return count;
 }
 
-void* updateRows(void* arg) {
-	printf("THREAD IN\n");
-	int i, j, t = (int) (long) arg; // t stands for the thread number
-	printf("THREAD %d\n", t);
-	printf("%d\n", t);
+void* updateRows(void* arg) { // thread function used to update rows
+	int i, j, t = (int) (long) arg; // t stands as a simple thread id to determine its rows to update
 
+	// Updates board based on t (the thread number) using game logic/randomness and ghost rows
 
-	for (i = 0 + (t * rows_per_thread); i < rows_per_thread + (t * rows_per_thread); i++) { 
-		for (j = 0; j < WIDTH; j++) {
+	for (i = 0 + (t * rows_per_thread); i < rows_per_thread + (t * rows_per_thread); i++) { // row
+		for (j = 0; j < WIDTH; j++) { // column
 			int neighbors = getNeighbors(curr, i, j); 
 
 			#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
-				int index = j + (rows_per_rank * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
+				int index = i + (rows_per_rank * mpi_rank); // index = local_row + (rows_per_rank * mpi_rank)
 				double value = GenVal(index);
-				if (THRESHOLD >= value) {
+				if (THRESHOLD > value) { // if below threshold, randomize update
 					next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
 					continue;
 				}
@@ -139,22 +137,21 @@ void* updateRows(void* arg) {
 		}
 	}
 
-	if (t != 0) pthread_exit(NULL);
+	if (t != 0) pthread_exit(NULL); // if not main thread, exit
 	return NULL;
 }
 
 int main(int argc, char *argv[]) {
-	// Initializes variables
+	// Initializes variables and MPI
 
 	int i, j, k = 0, t;
-	// pthread_attr_t attr;
 	InitDefault();
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	rows_per_rank = HEIGHT / mpi_size;
 	rows_per_thread = rows_per_rank / NUMTHREADS;
-	if (NUMTHREADS > 1) threadIDs = calloc(NUMTHREADS - 1, sizeof(pthread_t));
+	if (NUMTHREADS > 1) threadIDs = calloc(NUMTHREADS - 1, sizeof(pthread_t)); 
 	curr = (char**)calloc(rows_per_rank, sizeof(char*));
 	next = (char**)calloc(rows_per_rank, sizeof(char*));
 	for (i = 0; i < rows_per_rank; i++) curr[i] = (char*)calloc(WIDTH, sizeof(char));
@@ -177,18 +174,9 @@ int main(int argc, char *argv[]) {
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = 1;
 	#endif
 
-	// #if defined(GLIDER) || defined(GOSPER) || defined(BOARD)
-	// 	printBoard(curr);
-	// #endif
+	// Simulation running for TIME ticks
 
-	// Create pthreads
-	// pthread_attr_init(&attr ); // tell main thread it needs to join with child threads
-	// pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	// pthread_mutex_init (&mutexboard, NULL); // create mutex
-
-
-
-	for (t = 0; t <= TIME; t++, k = 0) { // simulation running for TIME ticks
+	for (t = 0; t <= TIME; t++, k = 0) { 
 		// Updates ghost rows with data from other ranks
 
 		MPI_Irecv(upGhost, WIDTH, MPI_CHAR, (mpi_rank == 0) ? mpi_size - 1 : mpi_rank - 1, 1, MPI_COMM_WORLD, &request);
@@ -205,44 +193,26 @@ int main(int argc, char *argv[]) {
 			printBoard(curr);
 		#endif
 
-		if (t == TIME) break; // ends loop
-
-		// Updates board using game logic/randomness and ghost rows
-
-		printf("THREAD START\n");
+		if (t == TIME) break; // ends loop when time has been hit after final ghost rows and board has printed
 
 		// Updates rows via threads (including main thread)
 
 		updateRows((void *) (long) k);
-		for (k = 1; k < NUMTHREADS; k++) pthread_create(&threadIDs[k-1], NULL, updateRows, (void *) (long) k);
-		
-		printf("THREADS CREATED\n");
-		// pthread_attr_destroy(&attr );
-
-		for (k = 0; k < NUMTHREADS - 1; k++) pthread_join(threadIDs[k], NULL); // join threads within node
-
-	// Running simulation
-
-		printf("THREADS JOINED\n");
+		for (k = 1; k < NUMTHREADS; k++) pthread_create(&threadIDs[k-1], NULL, updateRows, (void *) (long) k); // creates threads
+		for (k = 0; k < NUMTHREADS - 1; k++) pthread_join(threadIDs[k], NULL); // joins threads
 
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
 	}
 
 	// Frees variables, destroys mutex, and finalizes MPI
 
-	printf("FREEING\n");
-
-	for (i = 0; i < rows_per_rank; i++) if (curr[i]) free(curr[i]);
-	for (i = 0; i < rows_per_rank; i++) if (next[i]) free(next[i]);
-	if (curr) free(curr);
-	if (next) free(next);
-	if (upGhost) free(upGhost);
-	if (downGhost) free(downGhost);
+	for (i = 0; i < rows_per_rank; i++) free(curr[i]);
+	for (i = 0; i < rows_per_rank; i++) free(next[i]);
+	free(curr);
+	free(next);
+	free(upGhost);
+	free(downGhost);
 	if (threadIDs) free(threadIDs);
-
-	printf("DONE FREEING\n");
-
-	// pthread_mutex_destroy(&mutexboard);
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Finalize();
