@@ -14,7 +14,7 @@
 #define NUMTHREADS 4 // including main thread
 
 // Global Definitions
-double alive_cells_node;
+int alive_cells_rank;
 char **curr, **next, *upGhost, *downGhost;
 pthread_t* threadIDs = NULL;
 int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1, rows_per_thread = -1;
@@ -138,7 +138,7 @@ void* updateRows(void* arg) { // thread function used to update rows
 	}
 
 	pthread_mutex_lock (&mutexalive);
-	alive_cells_node += neighbors;
+	alive_cells_rank += neighbors;
 	pthread_mutex_unlock (&mutexalive);
 
 	if (t != 0) pthread_exit(NULL); // if not main thread, exit
@@ -149,8 +149,9 @@ int main(int argc, char *argv[]) {
 	// Initializes variables and MPI
 
 	int i, j, k, t;
-	double alive_cells_node = 0;
-	double alive_cells_all;
+	int * alive_cells_all;
+	alive_cells_all = (mpi_rank == 0) ? (int*)calloc(TIME, sizeof(int)) : NULL;
+	alive_cells_rank = 0;
 	InitDefault();
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -208,12 +209,17 @@ int main(int argc, char *argv[]) {
 		for (k = 0; k < NUMTHREADS - 1; k++) pthread_join(threadIDs[k], NULL); // joins threads
 
 		for (i = 0; i < rows_per_rank; i++) for (j = 0; j < WIDTH; j++) curr[i][j] = next[i][j]; // updates current board with new data
+	
+		MPI_Reduce (&alive_cells_rank, &alive_cells_all[t], 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 	}
 
-	MPI_Reduce (&alive_cells_node, &alive_cells_all, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-	if (mpi_rank = 0) {
-		printf("Finished simulation, number of alive cells: %f\n", alive_cells_all);
+	int total_alive_cells = 0;
+	for (int j = 0; j < TIME; j++) {
+		total_alive_cells += alive_cells_all[j];
+	}
+	if (mpi_rank == 0) {
+		printf("Finished simulation, number of alive cells: %d\n", total_alive_cells);
 	}
 
 	// Frees variables and finalizes MPI
