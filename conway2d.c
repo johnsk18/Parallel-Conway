@@ -125,7 +125,8 @@ void* updateRows(void* arg) { // thread function used to update rows
 			int neighbors = getNeighbors(curr, i, j); 
 
 			#if !defined(GLIDER) && !defined(GOSPER) // RNG for non-preset conway game
-				double value = GenVal(i); // each row has its own RNG stream
+				int index = i + (rows_per_rank * mpi_rank);
+				double value = GenVal(index); // each row has its own RNG stream
 				if (THRESHOLD > value) { // if below threshold, randomize update
 					next[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1;
 					continue;
