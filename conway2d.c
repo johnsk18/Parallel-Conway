@@ -73,8 +73,8 @@ void* updateRows(void* arg) { // thread function used to update rows
 		// Updates board based on thread_num (the thread number) using game logic/randomness and ghost rows	
 
 		for (i = 0 + (thread_num * rows_per_thread); i < rows_per_thread + (thread_num * rows_per_thread); ++i) { // row
+			double value = GenVal(i + (rows_per_rank * mpi_rank)); // each row has its own RNG stream
 			for (j = 0; j < WIDTH; ++j) { // column
-				double value = GenVal(i + (rows_per_rank * mpi_rank)); // each row has its own RNG stream
 				if (THRESHOLD > value) curr[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1; // if below threshold, randomize update
 				else { // if cell (dead or alive) has 3 neighbors OR has 3 neighbors while living, it lives, else it dies
 					int neighbors = getNeighbors(curr, i, j);
