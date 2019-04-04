@@ -21,17 +21,16 @@
 #define processor_frequency 1.0            
 #endif
 
-#define WIDTH (1 << 6) // 1 << x is the same as 2 ^ x
-#define HEIGHT (1 << 5) // mpi_size * NUMTHREADS <= HEIGHT
+#define WIDTH (1 << 15) // 1 << x is the same as 2 ^ x
+#define HEIGHT (1 << 15) // mpi_size * num_threads <= HEIGHT
 #define TIME 1
 #define THRESHOLD 0.25
-#define NUMTHREADS 4 // including main thread
 
 // Global Definitions
 char **curr, *upGhost, *downGhost;
 double g_time_in_secs = 0, g_start_cycles = 0, g_end_cycles = 0;
 long long total_alive_cells = 0, alive_cells_rank = 0, *alive_cells_all;
-int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1, rows_per_thread = -1;
+int mpi_size = -1, mpi_rank = -1, rows_per_rank = -1, rows_per_thread = -1, num_threads = -1;
 MPI_Request request, request2, request3, request4;
 MPI_Status status;
 pthread_barrier_t barrier; 
@@ -41,13 +40,13 @@ pthread_mutex_t mutexalive = PTHREAD_MUTEX_INITIALIZER;
 void printBoard(char** board) { // debug prints the board
 	int i, j, r;
 	MPI_Barrier(MPI_COMM_WORLD);
-	for (r = 0; r < mpi_size; r++) {
+	for (r = 0; r < mpi_size; ++r) {
 		if (mpi_rank == r) {
-			for (i = 0; i < 1 || (r == 0 && i < 50); i++) printf("\n");
+			for (i = 0; i < 1 || (r == 0 && i < 50); ++i) printf("\n");
 			for (j = 0; j < WIDTH; ++j) printf("%c", (upGhost[j]) ? 'X' : '.'); // prints up ghost row
 			printf(" Rank %d\n\n", mpi_rank);
-			for (i = 0; i < rows_per_rank; i++) {
-				for (j = 0; j < WIDTH; j++) printf("%c", (board[i][j]) ? 'X' : '.');
+			for (i = 0; i < rows_per_rank; ++i) {
+				for (j = 0; j < WIDTH; ++j) printf("%c", (board[i][j]) ? 'X' : '.');
 				printf("\n");
 			}
 			printf("\n");
@@ -70,11 +69,11 @@ int getNeighbors(char** board, int i, int j) { // returns the amount of living c
 void* updateRows(void* arg) { // thread function used to update rows
 	int i, j, t, thread_num = (int) (long) arg; // thread_num stands as a simple thread id to determine its rows to update
 
-	for (t = 0; t < TIME; t++) { // Simulation running for TIME ticks
+	for (t = 0; t < TIME; ++t) { // Simulation running for TIME ticks
 		// Updates board based on thread_num (the thread number) using game logic/randomness and ghost rows	
 
-		for (i = 0 + (thread_num * rows_per_thread); i < rows_per_thread + (thread_num * rows_per_thread); i++) { // row
-			for (j = 0; j < WIDTH; j++) { // column
+		for (i = 0 + (thread_num * rows_per_thread); i < rows_per_thread + (thread_num * rows_per_thread); ++i) { // row
+			for (j = 0; j < WIDTH; ++j) { // column
 				double value = GenVal(i + (rows_per_rank * mpi_rank)); // each row has its own RNG stream
 				if (THRESHOLD > value) curr[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1; // if below threshold, randomize update
 				else { // if cell (dead or alive) has 3 neighbors OR has 3 neighbors while living, it lives, else it dies
@@ -89,7 +88,7 @@ void* updateRows(void* arg) { // thread function used to update rows
 		// Counts all live cells to alive_cells_rank in a critical section
 
 		pthread_mutex_lock (&mutexalive);
-		for (i = 0 + (thread_num * rows_per_thread); i < rows_per_thread + (thread_num * rows_per_thread); i++) for (j = 0; j < WIDTH; j++) alive_cells_rank += curr[i][j];
+		for (i = 0 + (thread_num * rows_per_thread); i < rows_per_thread + (thread_num * rows_per_thread); ++i) for (j = 0; j < WIDTH; ++j) alive_cells_rank += curr[i][j];
 		pthread_mutex_unlock (&mutexalive);
 
 		pthread_barrier_wait(&barrier); // barrier to make sure all live cell counts and board has been updated by all threads
@@ -129,26 +128,27 @@ int main(int argc, char *argv[]) {
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+	num_threads = 256 / mpi_size;
 
 	#ifdef DEBUG
-		if (mpi_rank == 0) printf("Ranks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n\n", mpi_size, NUMTHREADS, HEIGHT, WIDTH, TIME);
+		if (mpi_rank == 0) printf("Ranks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n\n", mpi_size, num_threads, HEIGHT, WIDTH, TIME);
 	#endif
 
 	if (mpi_rank == 0) g_start_cycles = GetTimeBase();
 	rows_per_rank = HEIGHT / mpi_size;
-	rows_per_thread = rows_per_rank / NUMTHREADS;
+	rows_per_thread = rows_per_rank / num_threads;
 	alive_cells_all = (mpi_rank == 0) ? (long long*)malloc(TIME * sizeof(long long)) : NULL;
-	if (NUMTHREADS > 1) threadIDs = (pthread_t*)malloc((NUMTHREADS - 1) * sizeof(pthread_t));
-	pthread_barrier_init(&barrier, NULL, NUMTHREADS);
+	if (num_threads > 1) threadIDs = (pthread_t*)malloc((num_threads - 1) * sizeof(pthread_t));
+	pthread_barrier_init(&barrier, NULL, num_threads);
 
 	curr = (char**)malloc(rows_per_rank * sizeof(char*));
-	for (i = 0; i < rows_per_rank; i++) curr[i] = (char*)malloc(WIDTH * sizeof(char));
+	for (i = 0; i < rows_per_rank; ++i) curr[i] = (char*)malloc(WIDTH * sizeof(char));
 	upGhost = (char*)malloc(WIDTH * sizeof(char));
 	downGhost = (char*)malloc(WIDTH * sizeof(char));
 
 	// Sets the intial state of the board and ghost rows
 
-	for (i = 0; i < rows_per_rank; i++) memset(curr[i], 1, WIDTH);
+	for (i = 0; i < rows_per_rank; ++i) memset(curr[i], 1, WIDTH);
 	memset(upGhost, 1, WIDTH);
 	memset(downGhost, 1, WIDTH);
 	
@@ -156,9 +156,9 @@ int main(int argc, char *argv[]) {
 
 	MPI_Barrier( MPI_COMM_WORLD );
 
-	for (i = 1; i < NUMTHREADS; i++) pthread_create(&threadIDs[i-1], NULL, updateRows, (void *) (long) i); // creates threads
+	for (i = 1; i < num_threads; ++i) pthread_create(&threadIDs[i-1], NULL, updateRows, (void *) (long) i); // creates threads
 	updateRows((void *) (long) (i = 0));
-	for (i = 0; i < NUMTHREADS - 1; i++) pthread_join(threadIDs[i], NULL); // joins threads
+	for (i = 0; i < num_threads - 1; ++i) pthread_join(threadIDs[i], NULL); // joins threads
 
 	if (mpi_rank == 0) {
 		g_end_cycles = GetTimeBase();
@@ -166,11 +166,11 @@ int main(int argc, char *argv[]) {
 
 		#ifdef DEBUG
 			usleep(50*1000); // helps ordering of debug printing
-			for (int i = 0; i < TIME; i++) {
+			for (int i = 0; i < TIME; ++i) {
 				printf("%sLive cells from tick %d: %lld\n", (i == 0) ? "\n" : "", i, alive_cells_all[i]);
 				total_alive_cells += alive_cells_all[i];
 			}
-			printf("\nRanks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n", mpi_size, NUMTHREADS, HEIGHT, WIDTH, TIME);
+			printf("\nRanks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n", mpi_size, num_threads, HEIGHT, WIDTH, TIME);
 		#endif
 
 		printf("Finished simulation in %f seconds. Number of alive cells: %lld\n", g_time_in_secs, total_alive_cells);
@@ -180,7 +180,7 @@ int main(int argc, char *argv[]) {
 
 	// Frees variables and finalizes MPI
 
-	for (i = 0; i < rows_per_rank; i++) free(curr[i]);
+	for (i = 0; i < rows_per_rank; ++i) free(curr[i]);
 	free(curr);
 	free(upGhost);
 	free(downGhost);
