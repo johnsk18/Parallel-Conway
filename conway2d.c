@@ -21,9 +21,9 @@
 #define processor_frequency 1.0            
 #endif
 
-#define WIDTH (1 << 15) // 1 << x is the same as 2 ^ x
-#define HEIGHT (1 << 15) // mpi_size * num_threads <= HEIGHT
-#define TIME 1
+#define WIDTH (1 << 8) // 1 << x is the same as 2 ^ x
+#define HEIGHT (1 << 8) // mpi_size * num_threads <= HEIGHT
+#define TIME 256
 #define THRESHOLD 0.25
 
 // Global Definitions
@@ -73,8 +73,15 @@ void* updateRows(void* arg) { // thread function used to update rows
 		// Updates board based on thread_num (the thread number) using game logic/randomness and ghost rows	
 
 		for (i = 0 + (thread_num * rows_per_thread); i < rows_per_thread + (thread_num * rows_per_thread); ++i) { // row
-			double value = GenVal(i + (rows_per_rank * mpi_rank)); // each row has its own RNG stream
+
+
+			//double value = GenVal(i + (rows_per_rank * mpi_rank)); // each row has its own RNG stream
+
+
 			for (j = 0; j < WIDTH; ++j) { // column
+
+				double value = GenVal(i + (rows_per_rank * mpi_rank)); // each row has its own RNG stream
+
 				if (THRESHOLD > value) curr[i][j] = (value < 0.5 * THRESHOLD) ? 0 : 1; // if below threshold, randomize update
 				else { // if cell (dead or alive) has 3 neighbors OR has 3 neighbors while living, it lives, else it dies
 					int neighbors = getNeighbors(curr, i, j);
