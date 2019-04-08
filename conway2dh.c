@@ -11,7 +11,7 @@
 #include <mpi.h>
 #include "clcg4.h"
 
-// #define BGQ 1 // when running BG/Q, comment out when testing on mastiff
+//#define BGQ 1 // when running BG/Q, comment out when testing on mastiff
 
 #ifdef BGQ
 #include<hwi/include/bqc/A2_inlines.h>
@@ -21,10 +21,10 @@
 #define processor_frequency 1.0            
 #endif
 
-#define WIDTH (1 << 8) // 1 << x is the same as 2 ^ x
-#define HEIGHT (1 << 8) // mpi_size * num_threads <= HEIGHT
-#define TIME 128
-#define THRESHOLD 0.25
+#define WIDTH (1 << 15) // 1 << x is the same as 2 ^ x
+#define HEIGHT (1 << 15) // mpi_size * num_threads <= HEIGHT
+#define TIME 1
+#define THRESHOLD 1
 
 // Global Definitions
 char **curr, *upGhost, *downGhost;
@@ -43,7 +43,7 @@ typedef struct ColorType {
   unsigned char b;
 } Color;
 
-Color getColor (short s) { 
+Color getColor (unsigned short s) { 
 //This creates a map from Black to red to yellow to green to blue to white.
   Color c = {0, 0, 0};
   if (s < 256){
@@ -78,7 +78,8 @@ char saveMap(unsigned short ** heatmap) {
   else if (THRESHOLD == 0.25) filename = "map25.ppm";
   else if (THRESHOLD == 0.50) filename = "map50.ppm"; 
   else if (THRESHOLD == 0.75) filename = "map75.ppm";
-  else filename = "map??";
+  else if (THRESHOLD == 1)    filename = "map100.ppm";
+  else filename = "map??.ppm";
 
   FILE *file = fopen(filename, "wb");
   if (file == NULL) {
@@ -95,7 +96,7 @@ char saveMap(unsigned short ** heatmap) {
   for (int y = height-1; y >= 0; --y) {
     for (int x = 0; x < width; ++x) {
       Color color = getColor(heatmap[x][y]);
-      printf("%d,%d:r=%d,g=%d,b=%d\n", x, y, color.r, color.g, color.b);
+      //printf("%d,%d:r=%d,g=%d,b=%d\n", x, y, color.r, color.g, color.b);
       fputc(color.r, file);
       fputc(color.g, file);
       fputc(color.b, file);
@@ -103,6 +104,31 @@ char saveMap(unsigned short ** heatmap) {
   }
   fclose(file);
   return 1;
+}
+
+void saveTextMap(unsigned short ** heatmap){
+  char * filename;
+  int width = WIDTH/32, height = HEIGHT/32;
+  //Dumb way of determining the filename without needing fancy logic for it.
+  if (THRESHOLD == 0)         filename = "map00.txt";
+  else if (THRESHOLD == 0.25) filename = "map25.txt";
+  else if (THRESHOLD == 0.50) filename = "map50.txt"; 
+  else if (THRESHOLD == 0.75) filename = "map75.txt";
+  else if (THRESHOLD == 1)    filename = "map100.txt";
+  else filename = "map??.txt";
+
+  FILE *file = fopen(filename, "wb");
+  if (file == NULL) {
+    fprintf(stderr,"Unable to open %s for writing\n", filename);
+    return;
+  }
+
+  for (int y = 0; y < height; ++y){
+  	for (int x = 0; x < width; ++x){
+  		fprintf(file, "%d ", heatmap[x][y]);
+  	}
+  	fprintf(file,"\n");
+  }
 }
 
 int getNeighbors(char** board, int i, int j) { // returns the amount of living cells around board[i][j], optimized for minimal computation
@@ -178,7 +204,7 @@ int main(int argc, char *argv[]) {
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-	num_threads = 256 / mpi_size;
+	num_threads = (64 * 128) / mpi_size; // (threads_times_ranks * nodes) / mpi_size
 
 	if (mpi_rank == 0) g_start_cycles = GetTimeBase();
 	rows_per_rank = HEIGHT / mpi_size;
@@ -244,8 +270,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		//Now draw the heatmap.
-		saveMap(heatmap);
-
+		//saveMap(heatmap);
+		saveTextMap(heatmap);
 
 	} else {
 		//Give my rows to rank 0.
