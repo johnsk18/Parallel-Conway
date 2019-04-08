@@ -21,6 +21,8 @@
 #define processor_frequency 1.0            
 #endif
 
+#define PARALLELIO 1 // 1 when running 128 node experiments, else 0
+
 #define WIDTH (1 << 15) // 1 << x is the same as 2 ^ x
 #define HEIGHT (1 << 15) // mpi_size * num_threads <= HEIGHT
 #define TIME 1
@@ -36,6 +38,9 @@ MPI_Status status;
 pthread_barrier_t barrier; 
 pthread_t* threadIDs = NULL;
 pthread_mutex_t mutexalive = PTHREAD_MUTEX_INITIALIZER;
+MPI_File fh;
+MPI_Offset offset = 0;
+MPI_Status status;
 
 void printBoard(char** board) { // debug prints the board
 	int i, j, r;
@@ -109,6 +114,17 @@ void* updateRows(void* arg) { // thread function used to update rows
 			MPI_Wait(&request2, &status);
 		}
 
+		if (thread_num == 0) { // parallel I/O
+			// time how long it takes to write
+
+			int count = (WIDTH * HEIGHT) / mpi_size;
+
+			MPI_File_open(MPI_COMM_WORLD, "datafile", MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
+			MPI_file_write_at(fh, offset, curr, count, MPI_CHAR, &status);
+
+			offset++;
+		}
+
 		#ifdef BOARD // sleeps and prints board
 			usleep(50*1000); // sleeps for 50 milliseconds for debugging purposes
 			if (thread_num == 0) printBoard(curr);
@@ -161,8 +177,10 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < num_threads - 1; ++i) pthread_join(threadIDs[i], NULL); // joins threads
 
 	if (mpi_rank == 0) {
-		g_end_cycles = GetTimeBase();
-		g_time_in_secs = ((double)(g_end_cycles - g_start_cycles)) / processor_frequency;
+		#ifndef PARALLELIO
+			g_end_cycles = GetTimeBase();
+			g_time_in_secs = ((double)(g_end_cycles - g_start_cycles)) / processor_frequency;
+		#endif
 
 		#ifdef DEBUG
 			usleep(50*1000); // helps ordering of debug printing
@@ -172,6 +190,11 @@ int main(int argc, char *argv[]) {
 			}
 			printf("\nRanks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n", mpi_size, num_threads, HEIGHT, WIDTH, TIME);
 		#endif
+
+		/* #ifdef PARALLELIO
+			g_end_cycles = GetTimeBase();
+			g_time_in_secs = ((double)(g_end_cycles - g_start_cycles)) / processor_frequency;
+		#endif */
 
 		printf("Finished simulation in %f seconds. Number of alive cells: %lld\n", g_time_in_secs, total_alive_cells);
 	}
@@ -186,6 +209,7 @@ int main(int argc, char *argv[]) {
 	free(downGhost);
 	if (threadIDs) free(threadIDs);
 	
+	MPI_FILE_CLOSE( &fh );
 	MPI_Finalize();
 	return 0;
 }
