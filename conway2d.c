@@ -25,8 +25,8 @@
 
 #define WIDTH (1 << 15) // 1 << x is the same as 2 ^ x
 #define HEIGHT (1 << 15) // mpi_size * num_threads <= HEIGHT
-#define TIME 1
-#define THRESHOLD 0.25
+#define TIME 128
+#define THRESHOLD 0
 
 // Global Definitions
 char **curr, *upGhost, *downGhost;
@@ -120,7 +120,7 @@ void* updateRows(void* arg) { // thread function used to update rows
 			int count = (WIDTH * HEIGHT) / mpi_size;
 
 			MPI_File_open(MPI_COMM_WORLD, "datafile", MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
-			MPI_file_write_at(fh, offset, curr, count, MPI_CHAR, &status);
+			MPI_File_write_at(fh, offset, curr, count, MPI_CHAR, &status);
 
 			offset++;
 		}
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-	num_threads = 256 / mpi_size;
+	num_threads = (64 * 128) /mpi_size;
 
 	#ifdef DEBUG
 		if (mpi_rank == 0) printf("Ranks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n\n", mpi_size, num_threads, HEIGHT, WIDTH, TIME);
@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
 	free(downGhost);
 	if (threadIDs) free(threadIDs);
 	
-	MPI_FILE_CLOSE( &fh );
+	MPI_File_close( &fh );
 	MPI_Finalize();
 	return 0;
 }
