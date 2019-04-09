@@ -25,8 +25,8 @@
 
 #define WIDTH (1 << 15) // 1 << x is the same as 2 ^ x
 #define HEIGHT (1 << 15) // mpi_size * num_threads <= HEIGHT
-#define TIME 128
-#define THRESHOLD 0
+#define TIME 2
+#define THRESHOLD 0.25
 
 // Global Definitions
 char **curr, *upGhost, *downGhost;
@@ -39,7 +39,7 @@ pthread_barrier_t barrier;
 pthread_t* threadIDs = NULL;
 pthread_mutex_t mutexalive = PTHREAD_MUTEX_INITIALIZER;
 MPI_File fh;
-MPI_Offset offset = 0;
+MPI_Offset offset;
 MPI_Status status;
 
 void printBoard(char** board) { // debug prints the board
@@ -117,13 +117,20 @@ void* updateRows(void* arg) { // thread function used to update rows
 		if (thread_num == 0) { // parallel I/O
 			// time how long it takes to write
 
-			int count = (WIDTH * HEIGHT) / mpi_size;
+			char buffer[WIDTH+1];
+			buffer[WIDTH] = '\n';
 
-			MPI_File_open(MPI_COMM_WORLD, "datafile", MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
-			MPI_File_write_at(fh, offset, curr, count, MPI_CHAR, &status);
-
-			offset++;
+			MPI_File_open(MPI_COMM_WORLD, "datafile.txt", MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
+			
+			for (int j = 0; j < rows_per_rank; j++) {
+				for (int k = 0; k < WIDTH; k++) {
+					memcpy(&buffer[k], &curr[j][k], sizeof(curr[j][k])+1);
+				}
+				MPI_File_write_at(fh, (mpi_rank*rows_per_rank+j)*(WIDTH+1), buffer, WIDTH+1, MPI_CHAR, &status);
+			}
 		}
+
+		MPI_File_close( &fh );
 
 		#ifdef BOARD // sleeps and prints board
 			usleep(50*1000); // sleeps for 50 milliseconds for debugging purposes
@@ -144,7 +151,7 @@ int main(int argc, char *argv[]) {
 	MPI_Init( &argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-	num_threads = (64 * 128) /mpi_size;
+	num_threads = (512) /mpi_size;
 
 	#ifdef DEBUG
 		if (mpi_rank == 0) printf("Ranks: %d\nThreads: %d\nBoard: %d x %d\nTicks: %d\n\n", mpi_size, num_threads, HEIGHT, WIDTH, TIME);
@@ -177,11 +184,11 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < num_threads - 1; ++i) pthread_join(threadIDs[i], NULL); // joins threads
 
 	if (mpi_rank == 0) {
-		#ifndef PARALLELIO
+		//if (PARALLELIO == 0) {
 			g_end_cycles = GetTimeBase();
 			g_time_in_secs = ((double)(g_end_cycles - g_start_cycles)) / processor_frequency;
-		#endif
-
+		//}
+			
 		#ifdef DEBUG
 			usleep(50*1000); // helps ordering of debug printing
 			for (int i = 0; i < TIME; ++i) {
@@ -209,7 +216,6 @@ int main(int argc, char *argv[]) {
 	free(downGhost);
 	if (threadIDs) free(threadIDs);
 	
-	MPI_File_close( &fh );
 	MPI_Finalize();
 	return 0;
 }
